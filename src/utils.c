@@ -3,6 +3,7 @@
 #include <gio/gio.h>
 #include <glib.h>
 #include <glib/gstdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
@@ -127,28 +128,44 @@ gboolean rm_tree(const gchar *path, GError **error)
 	return TRUE;
 }
 
-
+/* Always return absolute paths with no symbolic links, /./ or /../ components */
 gchar *resolve_path(const gchar *basefile, gchar *path)
 {
 	g_autofree gchar *cwd = NULL;
 	g_autofree gchar *dir = NULL;
+	g_autofree gchar *tmppath = NULL;
+	gchar *grpath;
+	char *rpath;
 
 	if (path == NULL)
 		return NULL;
 
-	if (g_path_is_absolute(path))
-		return g_strdup(path);
+	if (g_path_is_absolute(path)) {
+		tmppath = g_strdup(path);
+		goto resolve_path;
+	}
 
 	cwd = g_get_current_dir();
 
-	if (!basefile)
-		return g_build_filename(cwd, path, NULL);
+	if (!basefile) {
+		tmppath = g_build_filename(cwd, path, NULL);
+		goto resolve_path;
+	}
 
 	dir = g_path_get_dirname(basefile);
-	if (g_path_is_absolute(dir))
-		return g_build_filename(dir, path, NULL);
+	if (g_path_is_absolute(dir)) {
+		tmppath = g_build_filename(dir, path, NULL);
+		goto resolve_path;
+	}
 
-	return g_build_filename(cwd, dir, path, NULL);
+	tmppath = g_build_filename(cwd, dir, path, NULL);
+
+resolve_path:
+	/* Don't mixup glib and libc types */
+	rpath = realpath(tmppath, NULL);
+	grpath = g_strdup(rpath);
+	free(rpath);
+	return grpath;
 }
 
 gboolean check_remaining_groups(GKeyFile *key_file, GError **error)
