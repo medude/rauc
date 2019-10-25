@@ -182,6 +182,12 @@ gboolean determine_slot_states(GError **error)
 			goto out;
 		}
 
+		if (g_strcmp0(r_context()->bootslot, "external") == 0) {
+			g_message("Detected external source boot, ignoring missing active slot");
+			res = TRUE;
+			goto out;
+		}
+
 		g_set_error_literal(
 				error,
 				R_SLOT_ERROR,

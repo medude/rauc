@@ -23,6 +23,21 @@ static const gchar *regex_match(const gchar *pattern, const gchar *string)
 	return NULL;
 }
 
+static gboolean regex_match_flag(const gchar *pattern, const gchar *string)
+{
+	g_autoptr(GRegex) regex = NULL;
+	g_autoptr(GMatchInfo) match = NULL;
+
+	g_return_if_fail(pattern);
+	g_return_if_fail(string);
+
+	regex = g_regex_new(pattern, 0, 0, NULL);
+	if (g_regex_match(regex, string, 0, &match))
+		return g_match_info_matches(match);
+
+	return FALSE;
+}
+
 static const gchar* get_cmdline_bootname(void)
 {
 	g_autofree gchar *contents = NULL;
@@ -35,6 +50,9 @@ static const gchar* get_cmdline_bootname(void)
 
 	if (!g_file_get_contents("/proc/cmdline", &contents, NULL, NULL))
 		return NULL;
+
+	if (regex_match_flag("rauc\\.slot\\.external", contents))
+		return "external";
 
 	bootname = regex_match("rauc\\.slot=(\\S+)", contents);
 	if (bootname)
